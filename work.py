@@ -17,4 +17,13 @@ print("\nOrders left:")
 for row in cur.execute("SELECT * FROM orders"): 
     print(row)
 
+cur.execute("Update users set email = ? where name = ?", ('sara.new@test.com', 'Sara'))
+conn.commit()
+
+conn.execute("Insert into users (name, email) values (?, ?)", ('Rahul', 'rahul@example.com'))
+conn.commit()
+
+for row in cur.execute("SELECT u.name, o.amount, o.status FROM users u JOIN orders o ON u.id = o.user_id WHERE o.status = 'paid'"):
+    print(row)
+    
 conn.close()
