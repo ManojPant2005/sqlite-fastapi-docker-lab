@@ -1,30 +1,33 @@
 # Learn SQLite - Hands-On with FastAPI & Docker
 
-This repo is my quick hands-on learning for SQLite. I already know SQL, so I focused on practice, not theory.
-
 ## What is SQLite?
 
-- File, not server: `mydata.db` is the whole DB. No user/password.
-- Only 5 types: TEXT, INTEGER, REAL, BLOB, NULL
-- No heavy ALTER - to change column, recreate table
-- `INTEGER PRIMARY KEY` = auto-increment
-- CLI helpers (only in sqlite3 terminal, not Python): `.tables`, `.schema table_name`, `.mode column`, `.headers on`
+- **File, not server:** `mydata.db` is the whole database. No username/password, just a file you can copy/backup/email.
+- **Only 5 types:** TEXT, INTEGER, REAL, BLOB, NULL (Type Affinity - loose typing)
+- **No heavy ALTER:** Can't easily DROP column, need to recreate table
+- **INTEGER PRIMARY KEY = auto-increment:** Don't use AUTOINCREMENT keyword unless needed
+- **CLI helpers (only in sqlite3 terminal, not Python):** `.tables`, `.schema table_name`, `.mode column`, `.headers on`
 
 ## Project Structure
 
 
 Learn/SqlLite/
-├── setup.py   -> Create fresh DB (run once)
-├── work.py    -> Daily practice for UPDATE/DELETE/JOIN
-├── api.py     -> FastAPI that uses mydata.db
-├── mydata.db  -> SQLite file (you can copy/backup it)
-└── README.md
+├── setup.py            -> Create fresh DB with sample data (run once)
+├── work.py             -> Daily practice for UPDATE/DELETE/JOIN + error handling
+├── api.py              -> FastAPI that uses mydata.db
+├── requirements.txt    -> Python deps (fastapi, uvicorn)
+├── Dockerfile          -> Recipe to build API image
+├── docker-compose.yml  -> Easy run config with volume for SQLite
+├── .dockerignore       -> Ignore __pycache__, venv etc in Docker build
+├── mydata.db           -> SQLite file (persists data)
+└── README.md           -> This file
 
 
-## Step 1: Setup
+## Step 1: Setup Database
 
 setup.py creates 2 tables and sample data:
 
+sql
 CREATE TABLE users (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
@@ -41,20 +44,21 @@ CREATE TABLE orders (
 );
 
 
-
+Run:
+bash
 python setup.py
+# Output: Setup done - 3 users, 4 orders created
 
-It prints: Setup done - 3 users, 4 orders created
 
-I checked in VS Code with Database Client extension - TABLES 2, 0 rows before insert, 3 rows after.
+Checked in VS Code with Database Client extension - TABLES 2, 0 rows before insert, 3 rows after.
 
 ## Step 2: The Loop I Use
 
+python
 import sqlite3
 conn = sqlite3.connect("mydata.db")
 cur = conn.cursor()
 cur.execute("PRAGMA foreign_keys = ON;")
-# ... my queries ...
 conn.commit()
 conn.close()
 
@@ -62,7 +66,7 @@ conn.close()
 ## Step 3: Errors I Faced & Fixed
 
 ### 1. FOREIGN KEY constraint failed
-When I did: DELETE FROM users WHERE name='Amit' -> failed because Amit had orders.
+DELETE FROM users WHERE name='Amit' failed because Amit had orders.
 
 Fix - delete child first:
 python
@@ -72,83 +76,128 @@ conn.commit()
 
 
 ### 2. UNIQUE constraint failed
-I ran work.py twice and tried to insert Rahul again with same email.
+Ran work.py twice and tried to insert Rahul again with same email.
 
 Fix - use ON CONFLICT:
-
-cur.execute("""
-    INSERT INTO users (name, email) VALUES (?, ?)
-    ON CONFLICT(email) DO NOTHING
-""", ('Rahul', 'rahul@example.com'))
+python
+cur.execute("INSERT INTO users (name, email) VALUES (?, ?) ON CONFLICT(email) DO NOTHING", ('Rahul', 'rahul@example.com'))
 
 
 ### 3. Forgot commit()
-If you don't do conn.commit(), data won't save.
+Without conn.commit(), data won't save.
 
-## Step 4: Practice Queries I Did
+## Step 4: Practice Queries
 
 python
-# All users
-cur.execute("SELECT * FROM users")
-
 # JOIN + GROUP BY
 cur.execute("SELECT u.name, SUM(o.amount) FROM users u LEFT JOIN orders o ON u.id=o.user_id GROUP BY u.id")
-
 # UPDATE
 cur.execute("UPDATE users SET email=? WHERE name=?", ('sara.new@test.com', 'Sara'))
 
-# JOIN for paid report
-cur.execute("SELECT u.name, o.amount FROM users u JOIN orders o ON u.id=o.user_id WHERE o.status='paid'")
 
+## Step 5: Use SQLite in API (FastAPI)
 
-## Step 5: Use SQLite in API
+Install: pip install fastapi uvicorn
 
-Install:
+api.py uses get_conn() with PRAGMA foreign_keys and row_factory = Row
 
-pip install fastapi uvicorn
-
-
-api.py:
-python
-from fastapi import FastAPI
-import sqlite3
-
-app = FastAPI()
-
-def get_conn():
-    conn = sqlite3.connect("mydata.db")
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON;")
-    return conn
-
-@app.get("/users")
-def get_users():
-    conn = get_conn()
-    users = conn.execute("SELECT * FROM users").fetchall()
-    conn.close()
-    return [dict(u) for u in users]
-
-
-Run:
-
+Run without Docker:
+bash
 python -m uvicorn api:app --reload
 
 
-Test in browser:
+Test:
 - http://127.0.0.1:8000/users
-- http://127.0.0.1:8000/docs -> Swagger UI to try APIs
+- http://127.0.0.1:8000/docs -> Swagger UI
+
+## Step 6: Dockerize It
+
+### Why Docker for this project?
+- No need to install Python/pip on other laptops
+- mydata.db file stays with app, easy to share
+- Same environment everywhere
+
+### Files
+
+**requirements.txt**
+
+fastapi==0.162.0
+uvicorn==0.54.0
+
+
+**Dockerfile**
+dockerfile
+FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+
+**docker-compose.yml**
+yaml
+services:
+  api:
+    build: .
+    container_name: sqlite_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./mydata.db:/app/mydata.db
+      - ./api.py:/app/api.py
+
+
+### How to Run with Docker
+
+bash
+docker --version
+docker-compose up --build
+# Open http://localhost:8000/users and /docs
+docker-compose down
+
+
+### Docker Errors I Faced & Fixed
+
+1. failed to connect to docker API at npipe:////./pipe/dockerDesktopLinuxEngine
+-> Docker Desktop app was not started. Fix: Open Docker Desktop and wait till Engine running (green).
+
+2. "/requirements.txt": not found
+-> My file was Requirements.txt (capital R) but Dockerfile had requirements.txt (small r). Linux inside Docker is case-sensitive.
+Fix: ren Requirements.txt requirements.txt
+
+### Docker Concepts Cleared
+
+| Concept | What it is |
+| Image | Snapshot with Python + FastAPI + my code |
+| Container | Running instance of that image |
+| Volume | ./mydata.db:/app/mydata.db - syncs file so data doesn't disappear |
+| Dockerfile | Recipe HOW to build image |
+| docker-compose.yml | Config HOW to run container |
 
 ## What I Learned
 
-- Always do PRAGMA foreign_keys = ON
+- Always PRAGMA foreign_keys = ON and conn.commit()
 - Use ? placeholder, not f-strings
-- mydata.db is just a file - easy to backup
-- commit() is must
+- For SQLite in Docker, volume is must or data is lost
+- Case sensitivity matters in Docker
+- Docker Desktop must be running before docker build
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+| GET | /users | All users |
+| GET | /orders | All orders |
+| GET | /report/paid | JOIN report |
+| GET | /search?q=name | Search |
+| POST | /users?name=&email= | Add user |
 
 ## Next
 
-- [ ] Add POST/DELETE APIs
+- [ ] Add PUT/DELETE APIs
 - [ ] Try Chinook sample DB
-- [ ] Learn indexes
+- [ ] Push image to Docker Hub
+- [ ] Add frontend as second service
 
-Created while learning hands-on in VS Code.
+Built hands-on in VS Code on Windows.
