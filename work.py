@@ -25,5 +25,14 @@ conn.commit()
 
 for row in cur.execute("SELECT u.name, o.amount, o.status FROM users u JOIN orders o ON u.id = o.user_id WHERE o.status = 'paid'"):
     print(row)
+
+# How many paid orders does each user have?
+for row in cur.execute("""
+  SELECT u.name, COUNT(o.id) as paid_orders 
+  FROM users u JOIN orders o ON u.id = o.user_id 
+  WHERE o.status='paid' 
+  GROUP BY u.id
+"""):
+    print(row)
     
 conn.close()
