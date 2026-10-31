@@ -1,0 +1,16 @@
+# Ignore Python cache
+__pycache__
+
+# Ignore local SQLite database (you usually don't want to bake your local data into the image)
+mydata.db
+
+# Ignore documentation and local notes
+README.md
+poc.md
+
+# Ignore local scripts that aren't needed to run the main app
+basics.py
+practices.py
+setup.py
+test.py
+work.py
