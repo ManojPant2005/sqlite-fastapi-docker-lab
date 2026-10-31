@@ -19,3 +19,18 @@ def get_users():
     users = conn.execute("SELECT * FROM users").fetchall()
     conn.close()
     return [dict(u) for u in users]
+
+@app.get("/users-paged")
+def get_users_paged(limit: int = 10, offset: int = 0):
+    conn = get_conn()
+    users = conn.execute("SELECT * FROM users LIMIT ? OFFSET ?", (limit, offset)).fetchall()
+    conn.close()
+    return [dict(u) for u in users]
+
+
+@app.get("/search")
+def search(q: str):
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM users WHERE name LIKE ?", (f"%{q}%",)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
