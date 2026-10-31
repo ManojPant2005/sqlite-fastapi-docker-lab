@@ -9,3 +9,7 @@ import sqlite3
 conn = sqlite3.connect(":memory:") # in-memory DB, disappears when you close
 cur = conn.cursor()
 
+
+# Hands-On Practices with FAST API
+# In terminal
+# pip install fastapi uvicorn
