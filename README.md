@@ -1,18 +1,5 @@
 # Learn SQLite - Hands-On with FastAPI & Docker
 
-> My journey from knowing SQL to running a live SQLite API inside Docker - all hands-on in VS Code.
-
-## Repo Name Suggestion
-
-**Recommended Name:** `sqlite-fastapi-docker-lab`
-
-**Other options:** `learn-sqlite-hands-on` / `sqlite-lite-starter`
-
-**Description for GitHub:**
-> A beginner-friendly, hands-on lab to learn SQLite quickly if you already know SQL. Covers SQLite basics, common errors (FOREIGN KEY, UNIQUE), Python sqlite3, FastAPI integration, and Dockerization with volume persistence. Built step-by-step in VS Code.
-
----
-
 ## What is SQLite?
 
 - **File, not server:** `mydata.db` is the whole database. No username/password, just a file you can copy/backup/email.
