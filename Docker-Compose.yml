@@ -1,0 +1,16 @@
+services:
+  api:
+    build: .
+    container_name: sqlite_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # This is the MOST important line for SQLite
+      # Your local mydata.db <-> container's mydata.db stays in sync
+      # So data doesn't disappear when container stops
+      - ./mydata.db:/app/mydata.db
+      - ./api.py:/app/api.py
+    restart: unless-stopped
+
+# volumes:
+#   sqlite_data:
